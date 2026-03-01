@@ -1,0 +1,17 @@
+[package]
+name = "flowsta-agent-linking-integrity"
+version = "0.1.0"
+edition = "2021"
+description = "Holochain integrity zome for cross-conductor agent identity linking (IsSamePersonEntry)"
+license = "MIT"
+repository = "https://github.com/WeAreFlowsta/flowsta-agent-linking"
+keywords = ["holochain", "identity", "agent-linking", "flowsta"]
+categories = ["authentication", "cryptography"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+holochain_serialized_bytes = { workspace = true }

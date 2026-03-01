@@ -1,0 +1,19 @@
+[package]
+name = "flowsta-agent-linking-coordinator"
+version = "0.1.0"
+edition = "2021"
+description = "Holochain coordinator zome for cross-conductor agent identity linking"
+license = "MIT"
+repository = "https://github.com/WeAreFlowsta/flowsta-agent-linking"
+keywords = ["holochain", "identity", "agent-linking", "flowsta"]
+categories = ["authentication", "cryptography"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "flowsta_agent_linking_coordinator"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+flowsta-agent-linking-integrity = { path = "../integrity" }

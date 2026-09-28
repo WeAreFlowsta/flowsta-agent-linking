@@ -47,6 +47,19 @@ pub fn create_external_link(input: ExternalLinkInput) -> ExternResult<ActionHash
         return Err(wasm_error!("Cannot link an agent to itself"));
     }
 
+    // One app agent attests to ONE external identity. A second live link to
+    // a different external agent would publish a claim that two people are
+    // one (an identity switch in Flowsta Vault is where an app meets this:
+    // the Vault now holds identity B while this agent is linked to A). The
+    // same external agent linking again is allowed (reinstall, restore).
+    // Revoke the old link first (`revoke_link`) to move an agent on purpose.
+    let live = get_linked_agents(my_pub_key.clone())?;
+    if live.iter().any(|a| a != &input.external_agent) {
+        return Err(wasm_error!(
+            "This agent is already linked to a different external identity. Revoke that link before linking another."
+        ));
+    }
+
     // Compute the canonical sorted key pair payload (78 bytes)
     let payload = sorted_agent_pair_bytes(&my_pub_key, &input.external_agent)?;
 

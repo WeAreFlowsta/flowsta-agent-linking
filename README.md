@@ -94,6 +94,8 @@ const linkedAgents = await appWs.callZome({
 | `are_agents_linked` | `{ agent_a, agent_b }` | `bool` | Check if two agents are linked |
 | `revoke_link` | `ActionHash` | `ActionHash` | Delete the pairwise entry |
 
+**One agent, one external identity (0.2.0).** `create_external_link` refuses when the calling agent already holds a live link to a *different* external agent: a second attestation would publish a claim that two people are one. Linking the same external agent again is allowed (reinstall, restore). To move an agent to another identity on purpose, `revoke_link` the old entry first. Flowsta Vault 1.5.0 applies the same rule on its side before showing any dialog, and its identity switcher is where apps meet this case.
+
 ## Entry Type
 
 ```rust

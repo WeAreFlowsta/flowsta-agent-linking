@@ -9,9 +9,9 @@ use hdi::prelude::*;
 /// same DHT. The entry is committed by the agent that IS on the DHT.
 ///
 /// For 3+ agents, create multiple pairwise entries (A↔B, A↔C, B↔C).
-/// Revocation: use Holochain's Delete action on the creation action.
+/// Revocation: a Delete of the creation action by one of the two agents.
 ///
-/// This zome is fully generic — no Flowsta-specific fields.
+/// This zome is fully generic - no Flowsta-specific fields.
 /// Any Holochain app can include it in their DNA for pairwise agent linking.
 ///
 /// IMPORTANT: All signatures are raw Ed25519 over the 78-byte sorted key pair.
@@ -93,19 +93,160 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
+        // A lookup link may only be created by one of the two linked agents,
+        // and only from one of their keys, to an IsSamePersonEntry that
+        // names that key. Anything else would let a lookup answer with an
+        // attestation that never named the queried agent.
         FlatOp::RegisterCreateLink {
-            link_type, ..
+            base_address,
+            target_address,
+            link_type,
+            action,
+            ..
         } => match link_type {
-            LinkTypes::AgentToIsSamePerson => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AgentToIsSamePerson => {
+                let entry = match linked_entry(&target_address)? {
+                    Some(e) => e,
+                    None => {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AgentToIsSamePerson must point at an IsSamePersonEntry".to_string(),
+                        ))
+                    }
+                };
+                Ok(validate_lookup_link(&entry, &base_address, &action.author))
+            }
         },
+        // Removing a lookup link: the same rule as creating one.
         FlatOp::RegisterDeleteLink {
-            link_type, ..
+            original_action,
+            target_address,
+            link_type,
+            action,
+            ..
         } => match link_type {
-            LinkTypes::AgentToIsSamePerson => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AgentToIsSamePerson => {
+                let entry = match linked_entry(&target_address)? {
+                    Some(e) => e,
+                    None => return Ok(ValidateCallbackResult::Valid),
+                };
+                if action.author != original_action.author && !is_participant(&action.author, &entry) {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Only one of the two linked agents can remove a lookup link".to_string(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         },
-        // Revocation via Delete is handled in the coordinator layer
-        // (non-deterministic — cannot check in validation).
+        // Revoking an attestation: only one of the two agents named in it
+        // may delete it. The original entry is fetched deterministically.
+        FlatOp::RegisterDelete(OpDelete { action }) => {
+            let entry = must_get_entry(action.deletes_entry_address.clone())?;
+            match IsSamePersonEntry::try_from(entry.as_content()) {
+                Ok(e) => {
+                    if !is_participant(&action.author, &e) {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Only one of the two linked agents can revoke this link".to_string(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                // Not one of ours.
+                Err(_) => Ok(ValidateCallbackResult::Valid),
+            }
+        }
         _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+/// Is `agent` one of the two agents named in the attestation?
+pub fn is_participant(agent: &AgentPubKey, entry: &IsSamePersonEntry) -> bool {
+    agent == &entry.agent_a || agent == &entry.agent_b
+}
+
+/// The rule for a lookup link: its base must be one of the two agents in
+/// the entry it points at, and its author must be one of them too.
+pub fn validate_lookup_link(
+    entry: &IsSamePersonEntry,
+    base: &AnyLinkableHash,
+    author: &AgentPubKey,
+) -> ValidateCallbackResult {
+    let base_is_member = base == &AnyLinkableHash::from(entry.agent_a.clone())
+        || base == &AnyLinkableHash::from(entry.agent_b.clone());
+    if !base_is_member {
+        return ValidateCallbackResult::Invalid(
+            "A lookup link must start from one of the two agents named in the entry".to_string(),
+        );
+    }
+    if !is_participant(author, entry) {
+        return ValidateCallbackResult::Invalid(
+            "Only one of the two linked agents can create a lookup link".to_string(),
+        );
+    }
+    ValidateCallbackResult::Valid
+}
+
+/// The IsSamePersonEntry a lookup link points at, fetched deterministically
+/// through the action that created it. `None` when the target is not an
+/// action hash or its record holds no IsSamePersonEntry.
+fn linked_entry(target: &AnyLinkableHash) -> ExternResult<Option<IsSamePersonEntry>> {
+    let action_hash = match ActionHash::try_from(target.clone()) {
+        Ok(h) => h,
+        Err(_) => return Ok(None),
+    };
+    let record = must_get_valid_record(action_hash)?;
+    Ok(record
+        .entry()
+        .as_option()
+        .and_then(|e| IsSamePersonEntry::try_from(e).ok()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn key(fill: u8) -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![fill; 36])
+    }
+
+    fn entry(a: u8, b: u8) -> IsSamePersonEntry {
+        let (mut ka, mut kb) = (key(a), key(b));
+        if ka > kb {
+            std::mem::swap(&mut ka, &mut kb);
+        }
+        IsSamePersonEntry {
+            agent_a: ka,
+            agent_b: kb,
+            signature_a: Signature([0u8; 64]),
+            signature_b: Signature([0u8; 64]),
+            created_at: 0,
+        }
+    }
+
+    #[test]
+    fn only_the_two_agents_are_participants() {
+        let e = entry(1, 2);
+        assert!(is_participant(&key(1), &e));
+        assert!(is_participant(&key(2), &e));
+        assert!(!is_participant(&key(3), &e));
+    }
+
+    #[test]
+    fn a_lookup_link_needs_a_member_base_and_a_member_author() {
+        let e = entry(1, 2);
+        let ok = validate_lookup_link(&e, &AnyLinkableHash::from(key(1)), &key(2));
+        assert!(matches!(ok, ValidateCallbackResult::Valid));
+        // A stranger's key as the base: the forged-lookup case.
+        let bad_base = validate_lookup_link(&e, &AnyLinkableHash::from(key(9)), &key(1));
+        assert!(matches!(bad_base, ValidateCallbackResult::Invalid(_)));
+        // A member base written by a stranger.
+        let bad_author = validate_lookup_link(&e, &AnyLinkableHash::from(key(1)), &key(9));
+        assert!(matches!(bad_author, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn keys_sort_the_same_way_as_the_entry_expects() {
+        let e = entry(7, 3);
+        assert!(e.agent_a < e.agent_b);
     }
 }
 

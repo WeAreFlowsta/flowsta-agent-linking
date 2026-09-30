@@ -35,7 +35,7 @@ pub struct AgentPair {
 ///
 /// The calling agent's conductor signs with `sign_raw`, and the external
 /// agent's signature is verified with `verify_signature_raw`. Both sign
-/// over the raw 78-byte sorted key pair — no MessagePack encoding.
+/// over the raw 78-byte sorted key pair - no MessagePack encoding.
 ///
 /// Security: The external agent's signature is verified before committing.
 /// The entry passes the same integrity validation as any IsSamePersonEntry.
@@ -101,7 +101,7 @@ pub fn create_external_link(input: ExternalLinkInput) -> ExternResult<ActionHash
     ))?;
 
     // Create lookup links from BOTH agents' pubkeys to the entry.
-    // The external agent's pubkey gets a link too — this allows anyone on the DHT
+    // The external agent's pubkey gets a link too - this allows anyone on the DHT
     // to look up "which local agents are linked to this Flowsta identity?"
     create_link(
         entry.agent_a.clone(),
@@ -124,7 +124,7 @@ pub fn create_external_link(input: ExternalLinkInput) -> ExternResult<ActionHash
 /// filters out deleted (revoked) entries, and returns the OTHER agent
 /// from each pair.
 ///
-/// Works for both local and external agent pubkeys — you can query
+/// Works for both local and external agent pubkeys - you can query
 /// "which local agents are linked to this Flowsta identity?" by passing
 /// the Flowsta Vault's agent pubkey.
 #[hdk_extern]
@@ -158,10 +158,15 @@ pub fn get_linked_agents(agent: AgentPubKey) -> ExternResult<Vec<AgentPubKey>> {
                 // Extract the entry and find the OTHER agent
                 if let Some(entry) = record_details.record.entry().as_option() {
                     if let Ok(is_same_person) = IsSamePersonEntry::try_from(entry) {
+                        // The queried agent must be one of the two in the
+                        // entry (validation guarantees it for new links; this
+                        // keeps the answer honest for anything older).
                         let other_agent = if is_same_person.agent_a == agent {
                             is_same_person.agent_b.clone()
-                        } else {
+                        } else if is_same_person.agent_b == agent {
                             is_same_person.agent_a.clone()
+                        } else {
+                            continue;
                         };
 
                         if !linked_agents.contains(&other_agent) {
@@ -185,8 +190,8 @@ pub fn are_agents_linked(agents: AgentPair) -> ExternResult<bool> {
 }
 
 /// Revoke a link by deleting the IsSamePersonEntry creation action.
-/// Only one of the two agents in the entry can revoke it (the one
-/// on this DHT — the external agent cannot call this function).
+/// Only one of the two agents in the entry can revoke it; the integrity
+/// zome enforces the same rule on the Delete itself.
 /// Returns the ActionHash of the Delete action.
 #[hdk_extern]
 pub fn revoke_link(entry_action_hash: ActionHash) -> ExternResult<ActionHash> {

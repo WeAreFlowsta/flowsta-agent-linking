@@ -1,6 +1,6 @@
 [package]
 name = "flowsta-agent-linking-integrity"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Holochain integrity zome for cross-conductor agent identity linking (IsSamePersonEntry)"
 license = "MIT"

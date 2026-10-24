@@ -21,7 +21,7 @@ No shared DNA, no API dependency, pure Ed25519 cryptography.
 
 The crates are consumed as a git dependency pinned to a release tag. They pin
 `hdi = 0.8.0`-style exact versions internally: your DNA's `hdi` / `hdk` must be
-on the same Holochain line (this tag: Holochain 0.6, `hdi =0.7.0`, `hdk =0.6.0`),
+on the same Holochain line (this tag: Holochain 0.7.1, `hdi =0.8.1`, `hdk =0.7.1`),
 or the build fails with trait-resolution errors rather than a clear message.
 
 ```toml
@@ -147,7 +147,7 @@ This crate uses `sign_raw`/`verify_signature_raw` (not `sign`/`verify_signature`
 
 ## Holochain Version
 
-Tag `v0.3.0` (integrity 0.2.0, coordinator 0.3.0) targets Holochain 0.6 (`hdi =0.7.0`, `hdk =0.6.0`). A Holochain 0.7 line will be a separate tag: 0.7 recompiles every zome to a new DNA hash.
+Tag `v0.4.0` (integrity 0.3.0, coordinator 0.4.0) targets Holochain 0.7.1 (`hdi =0.8.1`, `hdk =0.7.1`) and needs Rust 1.94 or newer (`rust-toolchain.toml` pins it); 0.7 recompiles every zome to a new DNA hash, so a DNA on this line is a new network. Tag `v0.3.0` (integrity 0.2.0, coordinator 0.3.0) is the Holochain 0.6 line (`hdi =0.7.0`, `hdk =0.6.0`).
 
 ## Versions
 

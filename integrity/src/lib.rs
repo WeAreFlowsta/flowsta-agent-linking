@@ -76,19 +76,15 @@ pub fn sorted_agent_pair_bytes(
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry {
-                app_entry, action, ..
-            } => match app_entry {
+        FlatOp::CreateEntry(op_entry) => match op_entry {
+            OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::IsSamePerson(entry) => {
-                    validate_is_same_person_entry(&entry, &action.author)
+                    validate_is_same_person_entry(&entry, action.author())
                 }
             },
-            OpEntry::UpdateEntry {
-                app_entry, action, ..
-            } => match app_entry {
+            OpEntry::UpdateEntry { app_entry, action, .. } => match app_entry {
                 EntryTypes::IsSamePerson(entry) => {
-                    validate_is_same_person_entry(&entry, &action.author)
+                    validate_is_same_person_entry(&entry, action.author())
                 }
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -97,14 +93,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         // and only from one of their keys, to an IsSamePersonEntry that
         // names that key. Anything else would let a lookup answer with an
         // attestation that never named the queried agent.
-        FlatOp::RegisterCreateLink {
-            base_address,
-            target_address,
-            link_type,
-            action,
-            ..
-        } => match link_type {
+        FlatOp::Link(OpLink::CreateLink { link_type, action }) => match link_type {
             LinkTypes::AgentToIsSamePerson => {
+                let base_address = action.data.base_address.clone();
+                let target_address = action.data.target_address.clone();
                 let entry = match linked_entry(&target_address)? {
                     Some(e) => e,
                     None => {
@@ -113,23 +105,20 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         ))
                     }
                 };
-                Ok(validate_lookup_link(&entry, &base_address, &action.author))
+                Ok(validate_lookup_link(&entry, &base_address, action.author()))
             }
         },
         // Removing a lookup link: the same rule as creating one.
-        FlatOp::RegisterDeleteLink {
-            original_action,
-            target_address,
-            link_type,
-            action,
-            ..
-        } => match link_type {
+        FlatOp::Link(OpLink::DeleteLink { link_type, action, original_action }) => match link_type {
             LinkTypes::AgentToIsSamePerson => {
+                let target_address = original_action.data.target_address.clone();
                 let entry = match linked_entry(&target_address)? {
                     Some(e) => e,
                     None => return Ok(ValidateCallbackResult::Valid),
                 };
-                if action.author != original_action.author && !is_participant(&action.author, &entry) {
+                if action.author() != original_action.author()
+                    && !is_participant(action.author(), &entry)
+                {
                     return Ok(ValidateCallbackResult::Invalid(
                         "Only one of the two linked agents can remove a lookup link".to_string(),
                     ));
@@ -139,11 +128,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         },
         // Revoking an attestation: only one of the two agents named in it
         // may delete it. The original entry is fetched deterministically.
-        FlatOp::RegisterDelete(OpDelete { action }) => {
-            let entry = must_get_entry(action.deletes_entry_address.clone())?;
+        FlatOp::Delete(OpDelete { action }) => {
+            let entry = must_get_entry(action.data.deletes_entry_address.clone())?;
             match IsSamePersonEntry::try_from(entry.as_content()) {
                 Ok(e) => {
-                    if !is_participant(&action.author, &e) {
+                    if !is_participant(action.author(), &e) {
                         return Ok(ValidateCallbackResult::Invalid(
                             "Only one of the two linked agents can revoke this link".to_string(),
                         ));

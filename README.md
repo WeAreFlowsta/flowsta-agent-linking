@@ -21,7 +21,7 @@ No shared DNA, no API dependency, pure Ed25519 cryptography.
 
 The crates are consumed as a git dependency pinned to a release tag. They pin
 `hdi = 0.8.0`-style exact versions internally: your DNA's `hdi` / `hdk` must be
-on the same Holochain line (this tag: Holochain 0.6, `hdi =0.7.0`, `hdk =0.6.0`),
+on the same Holochain line (this tag: Holochain 0.6, `hdi =0.7.0`, `hdk =0.6.0`; for 0.7.1 use `v0.4.0`, see Holochain Version below),
 or the build fails with trait-resolution errors rather than a clear message.
 
 ```toml
@@ -147,7 +147,7 @@ This crate uses `sign_raw`/`verify_signature_raw` (not `sign`/`verify_signature`
 
 ## Holochain Version
 
-Tag `v0.3.0` (integrity 0.2.0, coordinator 0.3.0) targets Holochain 0.6 (`hdi =0.7.0`, `hdk =0.6.0`). A Holochain 0.7 line will be a separate tag: 0.7 recompiles every zome to a new DNA hash.
+Tag `v0.3.0` (integrity 0.2.0, coordinator 0.3.0) targets Holochain 0.6 (`hdi =0.7.0`, `hdk =0.6.0`). **For Holochain 0.7.1 use tag `v0.4.0`** (integrity 0.3.0, coordinator 0.4.0, branch `holochain-0.7`, Rust 1.94+): 0.7 recompiles every zome to a new DNA hash, so a DNA on that line is a new network. Both tags keep working: the Flowsta Vault's link signature is the same on either line, so an app moves to 0.7 when it is ready, not by a date.
 
 ## Versions
 

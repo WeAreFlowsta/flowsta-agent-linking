@@ -21,17 +21,25 @@ No shared DNA, no API dependency, pure Ed25519 cryptography.
 
 The crates are consumed as a git dependency pinned to a release tag. They pin
 `hdi = 0.8.0`-style exact versions internally: your DNA's `hdi` / `hdk` must be
-on the same Holochain line (this tag: Holochain 0.7.1, `hdi =0.8.1`, `hdk =0.7.1`),
-or the build fails with trait-resolution errors rather than a clear message.
+on the same Holochain line as the tag, or the build fails with trait-resolution
+errors rather than a clear message.
+
+| Your DNA's Holochain | Tag | `hdi` / `hdk` |
+|---|---|---|
+| 0.7.1 | `v0.4.0` | `=0.8.1` / `=0.7.1` |
+| 0.6.x | `v0.3.0` | `=0.7.0` / `=0.6.0` |
+
+Both tags keep working: the Flowsta Vault's link signature is the same on
+either line, so an app moves to 0.7 when it is ready, not by a date.
 
 ```toml
 # In your integrity zome's Cargo.toml
 [dependencies]
-flowsta-agent-linking-integrity = { git = "https://github.com/WeAreFlowsta/flowsta-agent-linking", tag = "v0.3.0" }
+flowsta-agent-linking-integrity = { git = "https://github.com/WeAreFlowsta/flowsta-agent-linking", tag = "v0.4.0" }
 
 # In your coordinator zome's Cargo.toml
 [dependencies]
-flowsta-agent-linking-coordinator = { git = "https://github.com/WeAreFlowsta/flowsta-agent-linking", tag = "v0.3.0" }
+flowsta-agent-linking-coordinator = { git = "https://github.com/WeAreFlowsta/flowsta-agent-linking", tag = "v0.4.0" }
 ```
 
 ### 2. Add the zomes to your DNA manifest
@@ -153,6 +161,7 @@ Tag `v0.4.0` (integrity 0.3.0, coordinator 0.4.0) targets Holochain 0.7.1 (`hdi 
 
 | Tag | Integrity | Coordinator | Change |
 |---|---|---|---|
+| v0.4.0 | 0.3.0 | 0.4.0 | The same zomes on Holochain 0.7.1 (`hdi =0.8.1`, `hdk =0.7.1`, Rust 1.94+). A new DNA hash: an app that moves to this tag is on a new network. |
 | v0.3.0 | 0.2.0 | 0.3.0 | Validation: only a participant may revoke an entry or write its lookup links; lookups answer only for agents named in the entry. New DNA hash for apps that embed the integrity zome. |
 | (unreleased) | 0.1.0 | 0.2.0 | `create_external_link` refuses a second live link to a different external agent. |
 | (unreleased) | 0.1.0 | 0.1.0 | First release. |
